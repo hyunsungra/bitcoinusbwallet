@@ -1,0 +1,78 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            output: BitcoinUSBWallet.exe
+          - os: macos-latest
+            platform: darwin
+            output: BitcoinUSBWallet.app
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+      
+      - name: Build Wails app
+        run: |
+          wails build -platform ${{ matrix.platform }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.platform }}-build
+          path: build/bin/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            windows-build/*
+            darwin-build/*
+          body: |
+            ## Bitcoin USB Wallet Release
+            
+            ### 다운로드
+            - Windows: `BitcoinUSBWallet.exe`
+            - macOS: `BitcoinUSBWallet.app`
+            
+            ### 설치 방법
+            **Windows**: exe 파일 실행
+            **macOS**: app 파일을 Applications 폴더로 드래그
