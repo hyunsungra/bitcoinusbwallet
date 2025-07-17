@@ -1,82 +1,110 @@
 name: Build and Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+ push:
+   tags:
+     - 'v*'
 
 permissions: 
-  contents: write
+ contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            platform: windows
-            output: BitcoinUSBWallet.exe
-          - os: macos-latest
-            platform: darwin
-            output: BitcoinUSBWallet.app
-    
-    runs-on: ${{ matrix.os }}
-    
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Go
-        uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-      
-      - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
-      
-      - name: Build frontend
-        run: |
-          cd frontend
-          npm install
-          npm run build
-          cd ..
-      
-      - name: Build Wails app
-        run: |
-          wails build -platform ${{ matrix.platform }}
-      
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.platform }}-build
-          path: build/bin/*
-          if-no-files-found: warn
-          
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            windows-build/*
-            darwin-build/*
-          body: |
-            ## Bitcoin USB Wallet Release
-            
-            ### 다운로드
-            - Windows: `BitcoinUSBWallet.exe`
-            - macOS: `BitcoinUSBWallet.app`
-            
-            ### 설치 방법
-            **Windows**: exe 파일 실행
-            **macOS**: app 파일을 Applications 폴더로 드래그
+ build:
+   strategy:
+     matrix:
+       include:
+         - os: windows-latest
+           platform: windows
+           output: BitcoinUSBWallet.exe
+         - os: macos-latest
+           platform: darwin
+           output: BitcoinUSBWallet.dmg
+   
+   runs-on: ${{ matrix.os }}
+   
+   steps:
+     - name: Checkout
+       uses: actions/checkout@v4
+     
+     - name: Setup Go
+       uses: actions/setup-go@v4
+       with:
+         go-version: '1.21'
+     
+     - name: Setup Node.js
+       uses: actions/setup-node@v4
+       with:
+         node-version: '18'
+     
+     - name: Install Wails
+       shell: bash
+       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+     
+     - name: Build frontend
+       run: |
+         cd frontend
+         npm install
+         npm run build
+         cd ..
+     
+     - name: Build Wails app
+       shell: bash
+       run: |
+         if [ "${{ matrix.platform }}" == "darwin" ]; then
+           wails build -platform darwin/universal -package -o BitcoinUSBWallet
+         else
+           wails build -platform ${{ matrix.platform }} -o BitcoinUSBWallet
+         fi
+
+     - name: List build output 
+       shell: bash
+       run: |
+         ls -la build/bin/
+         if [ "${{ matrix.platform }}" == "darwin" ]; then
+           ls -la build/bin/*.dmg || true
+         fi
+
+     - name: Upload artifacts
+       uses: actions/upload-artifact@v4
+       with:
+         name: ${{ matrix.platform }}-build
+         path: |
+           build/bin/*.exe
+           build/bin/*.dmg
+           build/bin/*.app
+         if-no-files-found: warn
+
+ release:
+   needs: build
+   runs-on: ubuntu-latest
+   permissions:
+     contents: write    
+   steps:
+     - name: Download artifacts
+       uses: actions/download-artifact@v4
+       with:
+         path: artifacts        
+
+     - name: List downloaded files
+       run: |
+         ls -la artifacts/
+         ls -la artifacts/windows-build/ || true
+         ls -la artifacts/darwin-build/ || true
+
+     - name: Create Release
+       uses: softprops/action-gh-release@v2
+       with:
+         files: |
+           artifacts/windows-build/*
+           artifacts/darwin-build/*
+           
+         body: |
+           ## Bitcoin USB Wallet Release
+           
+           ### 다운로드
+           - Windows: `BitcoinUSBWallet.exe`
+           - macOS: `BitcoinUSBWallet.dmg`
+           
+           ### 설치 방법
+           **Windows**: exe 파일 실행
+           **macOS**: dmg 파일 열고 앱을 Applications 폴더로 드래그
