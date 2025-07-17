@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions: 
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -52,7 +55,8 @@ jobs:
         with:
           name: ${{ matrix.platform }}-build
           path: build/bin/*
-
+          if-no-files-found: warn
+          
   release:
     needs: build
     runs-on: ubuntu-latest
