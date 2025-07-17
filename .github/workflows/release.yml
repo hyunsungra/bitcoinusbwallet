@@ -13,9 +13,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -23,13 +25,15 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       
-      - name: Build
+      - name: Build Frontend
         run: |
           cd frontend
           npm install
           npm run build
           cd ..
-          wails build -platform windows -o BitcoinUSBWallet
+      
+      - name: Build Windows App
+        run: wails build -platform windows -o BitcoinUSBWallet.exe
       
       - name: Upload Windows Build
         uses: actions/upload-artifact@v4
@@ -41,9 +45,11 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+      
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
@@ -51,25 +57,47 @@ jobs:
       - name: Install Wails
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       
-      - name: Build
+      - name: Build Frontend
         run: |
           cd frontend
           npm install
           npm run build
           cd ..
-          wails build -platform darwin -o BitcoinUSBWallet
+      
+      - name: Build Mac App
+        run: wails build -platform darwin -o BitcoinUSBWallet
+      
+      - name: List build directory
+        run: ls -la build/bin/
       
       - name: Create DMG
         run: |
-          brew install create-dmg
+          # Homebrew 설치 확인
+          if ! command -v brew &> /dev/null; then
+            /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          
+          # create-dmg 설치
+          brew install create-dmg || true
+          
+          # DMG 생성
           create-dmg \
             --volname "Bitcoin USB Wallet" \
             --window-pos 200 120 \
             --window-size 600 400 \
             --icon-size 100 \
-            --app-drop-link 400 185 \
+            --app-drop-link 450 185 \
+            --hide-extension "BitcoinUSBWallet.app" \
+            --no-internet-enable \
             "BitcoinUSBWallet.dmg" \
-            "build/bin/"
+            "build/bin/BitcoinUSBWallet.app" || {
+              echo "create-dmg failed, trying alternative method..."
+              # 대체 방법: 단순 DMG 생성
+              hdiutil create -volname "Bitcoin USB Wallet" \
+                -srcfolder build/bin/BitcoinUSBWallet.app \
+                -ov -format UDZO \
+                BitcoinUSBWallet.dmg
+            }
       
       - name: Upload Mac Build  
         uses: actions/upload-artifact@v4
@@ -83,25 +111,45 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
         with:
           name: windows-exe
           path: release
       
-      - uses: actions/download-artifact@v4
+      - name: Download Mac artifact
+        uses: actions/download-artifact@v4
         with:
           name: mac-dmg
           path: release
       
-      - name: Check files
-        run: ls -la release/
+      - name: Check downloaded files
+        run: |
+          echo "=== Release directory contents ==="
+          ls -la release/
+          echo "=== File sizes ==="
+          du -h release/*
       
-      - uses: softprops/action-gh-release@v2
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
         with:
           files: release/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true
           body: |
             ## Bitcoin USB Wallet Release
             
             ### 다운로드
-            - Windows: `BitcoinUSBWallet.exe`
-            - macOS: `BitcoinUSBWallet.dmg`
+            - **Windows**: `BitcoinUSBWallet.exe`
+            - **macOS**: `BitcoinUSBWallet.dmg`
+            
+            ### 설치 방법
+            
+            #### Windows
+            1. `BitcoinUSBWallet.exe` 파일을 다운로드합니다
+            2. 파일을 실행합니다 (Windows Defender 경고가 나타날 수 있습니다)
+            
+            #### macOS
+            1. `BitcoinUSBWallet.dmg` 파일을 다운로드합니다
+            2. DMG 파일을 더블클릭하여 마운트합니다
+            3. 앱을 Applications 폴더로 드래그합니다
