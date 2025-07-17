@@ -1,23 +1,28 @@
 # README
 
+# Bitcoin USB Wallet
+
 ## About
 
-This is the official Wails Vue template.
+Bitcoin USB Wallet is a secure Bitcoin personal wallet application.
+It's a portable program that runs without installation, allowing wallet creation and verification even in offline environments.
+As the saying goes, "offline is the best security" - we recommend storing and running the executable file from a USB drive.
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+### Key Features
 
-## Live Development
+- Personal wallet creation
+- Personal wallet verification (QR code support)
+- Bitcoin transfer (requires online connection)
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+## Usage
+
+For detailed usage instructions, please visit https://bitcoinusbwallet.com
 
 ## Building
 
 To build a redistributable, production mode package, use `wails build`.
 
 # build command
-# window: wails build -platform windows/amd64 
-# mac: wails build -platform darwin/universal
+
+window: wails build -platform windows/amd64 
+mac: wails build -platform darwin/universal
