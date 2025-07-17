@@ -53,7 +53,7 @@ jobs:
           wails build -platform ${{ matrix.platform }} -o BitcoinUSBWallet
 
       - name: Create DMG (macOS only)
-        if: matrix.platform == 'darwin'
+        if: runner.os == 'macOS'
         run: |
           brew install create-dmg
           create-dmg \
@@ -70,16 +70,24 @@ jobs:
         shell: bash
         run: |
           ls -la build/bin/
-          ls -la *.dmg || true
+          if [ -f "BitcoinUSBWallet.dmg" ]; then
+            ls -la BitcoinUSBWallet.dmg
+          fi
 
-      - name: Upload artifacts
+      - name: Upload artifacts (Windows)
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-build
-          path: |
-            build/bin/*.exe
-            BitcoinUSBWallet.dmg
-            build/bin/BitcoinUSBWallet.app
+          name: windows-build
+          path: build/bin/*.exe
+          if-no-files-found: warn
+
+      - name: Upload artifacts (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: darwin-build
+          path: BitcoinUSBWallet.dmg
           if-no-files-found: warn
 
   release:
