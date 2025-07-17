@@ -9,49 +9,57 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: windows-latest
-            platform: windows
-          - os: macos-latest
-            platform: darwin
-    
-    runs-on: ${{ matrix.os }}
-    
+  build-windows:
+    runs-on: windows-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
       
       - name: Install Wails
-        shell: bash
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
       
-      - name: Build frontend
+      - name: Build
         run: |
           cd frontend
           npm install
           npm run build
           cd ..
+          wails build -platform windows -o BitcoinUSBWallet
       
-      - name: Build Wails app
-        shell: bash
-        run: |
-          wails build -platform ${{ matrix.platform }} -o BitcoinUSBWallet
+      - name: Upload Windows Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: build/bin/BitcoinUSBWallet.exe
 
-      - name: Create DMG (macOS only)
-        if: matrix.os == 'macos-latest'
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      
+      - name: Build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+          cd ..
+          wails build -platform darwin -o BitcoinUSBWallet
+      
+      - name: Create DMG
         run: |
           brew install create-dmg
           create-dmg \
@@ -60,53 +68,40 @@ jobs:
             --window-size 600 400 \
             --icon-size 100 \
             --app-drop-link 400 185 \
-            --no-internet-enable \
             "BitcoinUSBWallet.dmg" \
             "build/bin/"
-          mv BitcoinUSBWallet.dmg build/bin/
-
-      - name: List build output 
-        shell: bash
-        run: |
-          ls -la build/bin/
-
-      - name: Upload artifacts
+      
+      - name: Upload Mac Build  
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-build
-          path: build/bin/*
-          if-no-files-found: error
+          name: mac-dmg
+          path: BitcoinUSBWallet.dmg
 
   release:
-    needs: build
+    needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
     permissions:
-      contents: write    
+      contents: write
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
-          path: artifacts        
-
-      - name: List all downloaded files
-        run: |
-          find artifacts -type f -ls
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+          name: windows-exe
+          path: release
+      
+      - uses: actions/download-artifact@v4
         with:
-          files: |
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*
-            
+          name: mac-dmg
+          path: release
+      
+      - name: Check files
+        run: ls -la release/
+      
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
           body: |
             ## Bitcoin USB Wallet Release
             
             ### 다운로드
             - Windows: `BitcoinUSBWallet.exe`
             - macOS: `BitcoinUSBWallet.dmg`
-            
-            ### 설치 방법
-            **Windows**: exe 파일 실행
-            **macOS**: dmg 파일 열고 앱을 Applications 폴더로 드래그
