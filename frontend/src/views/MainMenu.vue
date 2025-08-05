@@ -37,9 +37,6 @@
         
       </div>
       
-      <div class="developer-info">
-        <p>Developed by ToritoSystem</p>
-      </div>
     </div>
   </div>
 </template>
